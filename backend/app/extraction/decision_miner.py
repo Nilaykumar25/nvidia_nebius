@@ -124,8 +124,6 @@ def mine_thread(llm: LLM, t: Thread) -> list[ExtractedDecision]:
     text = thread_text(t)
     if len(text) < 200:
         return []
-    # Sarvam-105b uses ~3000-4000 reasoning tokens even with reasoning_effort="low".
-    # Budget: 8000 tokens gives room for reasoning + JSON with multiple decisions.
     a = _parse(llm.complete_json(SYSTEM, text, 8000), t)
     b = _parse(llm.complete_json(SYSTEM_B, text, 8000), t)
     scores = agreement_score(a, b)

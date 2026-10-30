@@ -19,9 +19,9 @@ const LIMITATIONS = [
     body: 'Function names are extracted from git hunk headers (the text after the second @@ in a diff). This is accurate for C and Python, approximate for other languages. Tree-sitter is the upgrade path but was not implemented in this version.',
   },
   {
-    id: 'sarvam',
-    heading: 'Sarvam API endpoint and model name may change',
-    body: 'The Sarvam adapter targets an OpenAI-compatible endpoint. The endpoint URL and the supported model names (currently sarvam-105b) should be verified against Sarvam\'s current documentation before use. The sarvam-m model was deprecated during development of this project.',
+    id: 'llm-endpoint',
+    heading: 'LLM endpoint and model name may change',
+    body: 'The LLM client targets any OpenAI-compatible endpoint. The base URL and model name are configured via LLM_BASE_URL and LLM_MODEL in the environment. Verify these against your Nebius dashboard before deployment.',
   },
   {
     id: 'nvl',
@@ -41,13 +41,13 @@ const LIMITATIONS = [
 ]
 
 const TECH_STACK = [
-  { name: 'Neo4j AuraDB',     role: 'Knowledge graph database', detail: 'Cypher 5, vector + full-text indexes' },
-  { name: 'Sarvam AI',        role: 'LLM for decision mining',  detail: 'sarvam-105b, Hinglish/Hindi support' },
-  { name: 'PyDriller',        role: 'Git history ingestion',     detail: 'pre-selects commits via git log' },
-  { name: 'sentence-transformers', role: 'Embeddings',          detail: 'all-MiniLM-L6-v2, 384 dimensions' },
-  { name: 'FastAPI',          role: 'Backend API',               detail: 'Pydantic v2, async endpoints' },
-  { name: 'React 18 + Vite',  role: 'Frontend',                  detail: 'react-router-dom v6, code splitting' },
-  { name: '@neo4j-nvl/react', role: 'Graph visualisation',      detail: '0.3.9, InteractiveNvlWrapper' },
+  { name: 'Neo4j AuraDB',          role: 'Knowledge graph database', detail: 'Cypher 5, vector + full-text indexes' },
+  { name: 'NVIDIA Nemotron 3 Ultra', role: 'LLM for mining + answering', detail: 'Served via Nebius Token Factory, OpenAI-compatible client' },
+  { name: 'PyDriller',             role: 'Git history ingestion',     detail: 'pre-selects commits via git log' },
+  { name: 'sentence-transformers', role: 'Embeddings',               detail: 'all-MiniLM-L6-v2, 384 dimensions' },
+  { name: 'FastAPI',               role: 'Backend API',               detail: 'Pydantic v2, async endpoints' },
+  { name: 'React 18 + Vite',       role: 'Frontend',                  detail: 'react-router-dom v6, code splitting' },
+  { name: '@neo4j-nvl/react',      role: 'Graph visualisation',      detail: '0.3.9, InteractiveNvlWrapper' },
 ]
 
 const TEAM = [
@@ -96,16 +96,16 @@ export default function About() {
           </div>
         </section>
 
-        {/* Hackathon context */}
+        {/* Hackathon submission details */}
         <section className="about-section" aria-labelledby="hackathon-heading">
-          <h2 id="hackathon-heading" className="about-section__title">Hackathon context</h2>
+          <h2 id="hackathon-heading" className="about-section__title">Hackathon submission details</h2>
           <div className="about-context-grid">
             {[
-              { label: 'Event',     value: 'hackFront India' },
-              { label: 'Theme',     value: 'AI and Developer Tools' },
-              { label: 'Problem statement', value: 'PS 01 — "Why The Code Is Like This"' },
-              { label: 'Track',     value: 'Neo4j — Best Use of Neo4j' },
-              { label: 'Optional angle', value: 'Sarvam — Hindi/Hinglish query support' },
+              { label: 'Event',      value: 'Nebius × NVIDIA Global AI Hackathon' },
+              { label: 'Track',      value: 'Coding and Agentic Engineering' },
+              { label: 'LLM',        value: 'NVIDIA Nemotron 3 Ultra' },
+              { label: 'Inference',  value: 'Nebius Token Factory (OpenAI-compatible API)' },
+              { label: 'Multilingual', value: 'Hindi/Hinglish query normalisation via Nemotron' },
             ].map(({ label, value }) => (
               <div key={label} className="about-context-item">
                 <dt>{label}</dt>

@@ -44,8 +44,8 @@ Show:
 | # | Failure | Mitigation |
 |---|---------|------------|
 | 1 | AuraDB serverless sleeps after idle | Pre-warm with `warm_demo.py`; the `db.run()` auto-reconnects on stale connections |
-| 2 | Sarvam API rate-limited (429) | Provider retries with exponential backoff; cache means repeated demo questions don't hit the API |
-| 3 | Sarvam returns empty response | Provider strips `</think>` blocks; `reasoning_effort=None` disables reasoning; cache has known-good responses |
+| 2 | LLM rate-limited (429) | Provider retries with exponential backoff; cache means repeated demo questions don't hit the API |
+| 3 | LLM returns empty or malformed response | Provider strips `<think>` blocks; robust JSON extraction retries once with stricter prompt; cache has known-good responses |
 | 4 | Network latency spike | Demo uses cached responses (sub-1s); p95 is 2s |
 | 5 | Browser CORS error | CORS allows localhost:5173; set `ALLOWED_ORIGINS` in .env if using a different port |
 | 6 | Graph is empty | Run `make schema && make ingest && make build --limit 200 && make supersede` before demo |

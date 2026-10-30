@@ -90,7 +90,7 @@ def main() -> None:
         print("No threads to mine. Provide thread IDs or ensure commits.jsonl exists.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Mining {len(threads)} thread(s) with {settings.llm_provider}/{settings.sarvam_model}...\n")
+    print(f"Mining {len(threads)} thread(s) with LLM model {settings.llm_model!r}...\n")
 
     llm = get_llm()
     total_found = 0

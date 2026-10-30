@@ -53,11 +53,21 @@ class AskRequest(BaseModel):
 
 
 def _llm_health() -> dict:
-    """Report LLM config without making a live call."""
-    provider = settings.llm_provider
-    model = settings.sarvam_model if provider == "sarvam" else settings.llm_model
-    key_set = bool(settings.sarvam_api_key if provider == "sarvam" else settings.anthropic_api_key)
-    return {"provider": provider, "model": model, "key_set": key_set}
+    """Report LLM config and perform a minimal live ping."""
+    base_url = settings.llm_base_url
+    model = settings.llm_model
+    key_set = bool(settings.llm_api_key)
+    ping_ok: bool | None = None
+    if key_set and base_url and model:
+        try:
+            from .llm.provider import get_llm
+            llm = get_llm()
+            result = llm.complete("You are a health check assistant.", "Reply with the single word: ok", 10, cache=False)
+            ping_ok = bool(result and result.strip())
+        except Exception as exc:
+            log.warning("LLM ping failed: %s", exc)
+            ping_ok = False
+    return {"model": model, "base_url": base_url, "key_set": key_set, "ping_ok": ping_ok}
 
 
 @app.get("/health")

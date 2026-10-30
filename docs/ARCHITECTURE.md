@@ -2,7 +2,7 @@
 Pipeline: `ingest` (git + GitHub -> JSONL cache) -> `build_graph` (entities, evidence, decisions -> Neo4j) -> `run_supersession` -> `serve` (FastAPI GraphRAG) -> React UI -> `run_eval`.
 
 ## Question path
-1. Normalise language (optional Sarvam translation for Hindi/Hinglish).
+1. Normalise language (Nemotron translation for Hindi/Hinglish).
 2. Link entities: exact identifier match, then full-text over entity names.
 3. Fetch governing decisions with the `DECISIONS_BY_ENTITY` template (hop 1). If nothing, vector search over Decision embeddings (hop 2).
 4. If a matched decision is superseded or reversed, fetch and promote its replacement.

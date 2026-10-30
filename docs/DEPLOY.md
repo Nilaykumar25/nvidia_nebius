@@ -1,65 +1,70 @@
 # Deployment Guide — Render (backend) + Vercel (frontend)
 
-This guide walks you through deploying IntentLens with:
-- **Render** (free Python web service) — FastAPI backend
-- **Vercel** (free hobby plan) — React frontend
-
-The Neo4j AuraDB and Sarvam AI are cloud services — no additional hosting needed.
-
----
-
-## Architecture after deployment
+IntentLens backend is a Python/FastAPI app. Frontend is a React SPA.
+Backend → Render free tier. Frontend → Vercel hobby plan.
 
 ```
 Browser
   │
   ▼
-Vercel (React SPA)
-  │  direct API calls via VITE_API_URL
+Vercel  (React SPA, static)
+  │  VITE_API_BASE_URL → Render URL
   ▼
-Render (FastAPI)  ──►  Neo4j AuraDB (cloud)
-                  ──►  Sarvam AI (cloud)
+Render  (FastAPI, Python)
+  │
+  ├──► Neo4j AuraDB       (cloud graph DB)
+  └──► NVIDIA API          (Nemotron 3 Ultra LLM)
+       integrate.api.nvidia.com/v1
 ```
 
 ---
 
 ## Prerequisites
 
-- GitHub repository with this code pushed
-- Neo4j AuraDB instance running (keep your URI, user, password)
-- Sarvam AI API key
-- Accounts at render.com and vercel.com (both free)
+| What | Where |
+|---|---|
+| Neo4j AuraDB instance | [console.neo4j.io](https://console.neo4j.io) — free tier is enough |
+| NVIDIA API key | [build.nvidia.com](https://build.nvidia.com) → get API key |
+| GitHub PAT | [github.com/settings/tokens](https://github.com/settings/tokens) → Classic, `public_repo` scope |
+| Render account | [render.com](https://render.com) — free |
+| Vercel account | [vercel.com](https://vercel.com) — free |
 
 ---
 
-## Step 1 — Deploy the backend on Render
+## Step 1 — Deploy backend on Render
 
-### 1a. Connect your repo
+### 1a. Create the web service
 
-1. Go to [dashboard.render.com](https://dashboard.render.com) → **New → Web Service**
-2. Connect your GitHub account and select your `intentlens` repository
-3. Render will auto-detect `render.yaml` — click **Apply**
+1. Go to **dashboard.render.com** → New → Web Service
+2. Connect GitHub → select the `intentlens` repository
+3. Render detects `render.yaml` automatically → click **Apply**
 
-### 1b. Configure environment variables
+### 1b. Set secrets in Render dashboard
 
-In the Render dashboard → your service → **Environment**, add these secrets
-(they are marked `sync: false` in `render.yaml` so Render won't auto-fill them):
+Go to your service → **Environment** → add these (all marked `sync: false` in `render.yaml` so Render never auto-fills them):
 
 | Key | Value |
 |-----|-------|
-| `NEO4J_URI` | `neo4j+s://xxxxxxxx.databases.neo4j.io` |
-| `NEO4J_USER` | `xxxxxxxx` |
+| `NEO4J_URI` | `neo4j+s://<your-instance-id>.databases.neo4j.io` |
+| `NEO4J_USER` | `<your-instance-id>` (e.g. `228d5e41`) |
 | `NEO4J_PASSWORD` | your AuraDB password |
-| `NEO4J_DATABASE` | `xxxxxxxx` (same as user on AuraDB free) |
-| `SARVAM_API_KEY` | `sk_...` |
-| `GITHUB_TOKEN` | `ghp_...` (only needed if you re-run ingest) |
-| `ALLOWED_ORIGINS` | leave blank for now — fill in after Vercel deploy |
+| `NEO4J_DATABASE` | `<your-instance-id>` (same as user on AuraDB free) |
+| `LLM_API_KEY` | your `nvapi-...` key from build.nvidia.com |
+| `GITHUB_TOKEN` | `ghp_...` (only needed if re-running ingest) |
+
+Non-secret values are already set in `render.yaml` with `value:`:
+
+| Key | Value already in render.yaml |
+|-----|-------------------------------|
+| `LLM_BASE_URL` | `https://integrate.api.nvidia.com/v1` |
+| `LLM_MODEL` | `nvidia/nemotron-3-ultra-550b-a55b` |
+| `LLM_TIMEOUT_SECONDS` | `60` |
+| `LLM_MAX_RETRIES` | `3` |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` |
 
 ### 1c. Deploy
 
-Click **Save Changes** → Render builds and deploys automatically.
-
-After ~3 minutes the service will be live. Copy the URL — it looks like:
+Click **Save Changes** → Render builds (~3 min). Copy your service URL:
 ```
 https://intentlens-api.onrender.com
 ```
@@ -69,132 +74,118 @@ Test it:
 curl https://intentlens-api.onrender.com/health
 # → {"status":"ok"}
 
-curl https://intentlens-api.onrender.com/stats
-# → {"commits":1372,"decisions":570,...}
+curl https://intentlens-api.onrender.com/ready
+# → {"status":"ready","neo4j":true,"llm":{"model":"nvidia/nemotron-3-ultra-550b-a55b","ping_ok":true}}
 ```
-
-### 1d. Update ALLOWED_ORIGINS (after Vercel deploy)
-
-Once you have your Vercel URL (Step 2), come back to Render → Environment and set:
-```
-ALLOWED_ORIGINS = https://your-app.vercel.app
-```
-Then click **Save** — Render redeploys automatically.
 
 ---
 
-## Step 2 — Deploy the frontend on Vercel
+## Step 2 — Deploy frontend on Vercel
 
 ### 2a. Import project
 
-1. Go to [vercel.com/new](https://vercel.com/new)
-2. Click **Import Git Repository** → select your `intentlens` repo
-3. Set the **Root Directory** to `frontend` (important!)
-4. Framework: **Vite** (auto-detected)
+1. Go to **vercel.com/new** → Import Git Repository → select the `intentlens` repo
+2. Set **Root Directory** to `frontend`
+3. Framework: **Vite** (auto-detected from `vercel.json`)
 
-### 2b. Set environment variables
+### 2b. Set environment variable
 
-In the Vercel project settings → **Environment Variables**, add:
+In Vercel → Project → **Environment Variables**:
 
 | Key | Value |
 |-----|-------|
-| `VITE_API_URL` | `https://intentlens-api.onrender.com` |
+| `VITE_API_BASE_URL` | `https://intentlens-api.onrender.com` ← your Render URL from Step 1c |
 
-> This is the Render URL from Step 1c. Vercel injects it at build time
-> via `import.meta.env.VITE_API_URL` in `src/api.js`.
+> This is the only env var the frontend needs. It is injected at build time.
+> `vercel.json` handles SPA routing (all paths → `index.html`).
 
-### 2c. Build settings (Vercel auto-detects these from package.json)
+### 2c. Deploy
 
-| Setting | Value |
-|---------|-------|
-| Build Command | `npm run build` |
-| Output Directory | `dist` |
-| Install Command | `npm install` |
-
-Click **Deploy**.
-
-After ~2 minutes your frontend is live at:
+Click **Deploy** → frontend live at e.g.:
 ```
 https://intentlens.vercel.app
 ```
-
-### 2d. Update Render CORS (loop back to Step 1d)
-
-In Render → Environment → `ALLOWED_ORIGINS`:
-```
-https://intentlens.vercel.app
-```
-Save → redeploy.
 
 ---
 
-## Step 3 — Verify end-to-end
+## Step 3 — Wire CORS together
 
-Open your Vercel URL and test all three demo states:
-
+Back in **Render** → your service → Environment → update `ALLOWED_ORIGINS`:
 ```
-/ask?demo=1
+ALLOWED_ORIGINS=https://intentlens.vercel.app,http://localhost:5173
 ```
+Save → Render redeploys automatically.
 
-| Button | Expected |
-|--------|----------|
-| Multi-Part AOF | ANSWERED — High confidence, evidence rail |
+---
+
+## Step 4 — Verify end-to-end
+
+Open your Vercel URL and go to `/ask?demo=1`. Check all three states:
+
+| Demo button | Expected result |
+|-------------|-----------------|
+| Multi-Part AOF | ANSWERED — High confidence, evidence rail, model badge shows Nemotron |
 | Bind address | ANSWERED with superseded banner + history |
 | updateSlavesWaitingBgsave | REFUSED — last changers shown |
 
 Check `/explore` — search `repl-backlog-size` and the graph loads.
 
+Check the footer: shows "Powered by NVIDIA Nemotron 3 Ultra on Nebius Token Factory".
+
+---
+
+## Environment variable reference
+
+| Variable | Required | Where to set | Notes |
+|---|---|---|---|
+| `NEO4J_URI` | ✅ | Render (secret) | `neo4j+s://...` |
+| `NEO4J_USER` | ✅ | Render (secret) | Instance ID |
+| `NEO4J_PASSWORD` | ✅ | Render (secret) | AuraDB password |
+| `NEO4J_DATABASE` | ✅ | Render (secret) | Instance ID |
+| `LLM_BASE_URL` | ✅ | `render.yaml` value | `https://integrate.api.nvidia.com/v1` |
+| `LLM_API_KEY` | ✅ | Render (secret) | `nvapi-...` |
+| `LLM_MODEL` | ✅ | `render.yaml` value | `nvidia/nemotron-3-ultra-550b-a55b` |
+| `LLM_TIMEOUT_SECONDS` | optional | `render.yaml` value | default 60 |
+| `LLM_MAX_RETRIES` | optional | `render.yaml` value | default 3 |
+| `GITHUB_TOKEN` | ingest only | Render (secret) | `ghp_...` |
+| `ALLOWED_ORIGINS` | ✅ | `render.yaml` (update after Vercel) | Your Vercel URL |
+| `VITE_API_BASE_URL` | ✅ | Vercel env vars | Your Render URL |
+
 ---
 
 ## Troubleshooting
 
-### "Failed to load resource: CORS error" in browser console
+**CORS error in browser console**
+`ALLOWED_ORIGINS` in Render doesn't include your Vercel URL. Update it and save — Render redeploys.
 
-The Render `ALLOWED_ORIGINS` doesn't include your Vercel URL. Update it in
-Render → Environment → `ALLOWED_ORIGINS` and redeploy.
+**`/ready` returns `neo4j: false`**
+AuraDB free tier pauses after 72 hours idle. Resume it at [console.neo4j.io](https://console.neo4j.io) — takes ~30s.
 
-### Backend returns 500 on `/ask`
+**`/ready` returns `ping_ok: false`**
+`LLM_API_KEY` is wrong or expired. Regenerate at [build.nvidia.com](https://build.nvidia.com).
 
-Check Render logs. Most common cause: Neo4j AuraDB is paused (free tier pauses
-after 72 hours of inactivity). Resume it at console.neo4j.io.
+**Stats strip shows zeros on landing**
+Neo4j connection failed or graph is empty. Check `/ready`.
 
-### Render service is sleeping (free tier)
-
-Render free tier spins down after 15 minutes of inactivity. The first request
-after sleep takes ~30 seconds. For a demo, send one warmup request first:
+**Render free tier sleeping**
+First request after 15 min idle takes ~30s. Warmup before demo:
 ```bash
 curl https://intentlens-api.onrender.com/health
 ```
 
-### Stats strip shows zeros on landing page
+**`VITE_API_BASE_URL` not working**
+It must be set *before* the Vercel build runs (not at runtime). Set it in Vercel → Settings → Environment Variables → then trigger a redeploy.
 
-The Sarvam key or Neo4j connection failed. Check `/ready` endpoint:
+---
+
+## Optional: Nebius Serverless Endpoints
+
+If you want the full stack on Nebius infrastructure, deploy the backend container to Nebius Serverless Endpoints instead of Render:
+
 ```bash
-curl https://intentlens-api.onrender.com/ready
+docker build -t intentlens-api .
+# Push to Nebius Container Registry, then create a Serverless Endpoint
+# pointing to the image with the same env vars listed above
 ```
 
-### "VITE_API_URL not set" — all API calls going to /api/...
-
-The `VITE_API_URL` env var was not set before building on Vercel. Go to
-Vercel → Settings → Environment Variables → add it → Redeploy.
-
----
-
-## Free tier limits
-
-| Service | Limit | Notes |
-|---------|-------|-------|
-| Render free | 750 hours/month, sleeps after 15 min | Upgrade to Starter $7/mo to avoid sleep |
-| Vercel hobby | 100 GB bandwidth/month | More than enough |
-| Neo4j AuraDB free | 1 instance, pauses after 72h idle | Resume takes ~30 sec |
-| Sarvam AI | Pay-per-use | Very cheap for demo volumes |
-
----
-
-## Custom domain (optional)
-
-**Vercel:** Project → Settings → Domains → Add domain.
-
-**Render:** Service → Settings → Custom Domain.
-
-After adding a custom domain, update `ALLOWED_ORIGINS` in Render to include it.
+Set `VITE_API_BASE_URL` in Vercel to your Nebius endpoint URL instead of the Render URL.

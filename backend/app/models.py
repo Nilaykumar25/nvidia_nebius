@@ -104,3 +104,4 @@ class AnswerResponse(BaseModel):
     related: list[dict] = Field(default_factory=list)
     graph: dict = Field(default_factory=lambda: {"nodes": [], "rels": []})
     latency_ms: int = 0
+    llm_model: str = ""

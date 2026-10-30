@@ -3,7 +3,7 @@ from __future__ import annotations
 import re, time
 from ..config import settings
 from ..graph.db import Neo4jDB
-from ..llm.provider import LLM, embed, get_llm, get_sarvam
+from ..llm.provider import LLM, embed, get_llm, translate_to_english
 from ..models import AnswerResponse, Confidence, EvidenceItem, Factors
 from ..reasoning import confidence as conf
 from . import cypher as Q
@@ -54,11 +54,7 @@ class GraphRAG:
     # ---- steps -------------------------------------------------------------
     def normalize(self, question: str, lang: str) -> str:
         if lang in ("hi", "hinglish"):
-            try:
-                llm = get_sarvam() if settings.sarvam_api_key else self.llm
-                return llm.complete("Translate the question to English. Keep code identifiers unchanged. Output only the translation.", question, 200)
-            except Exception:
-                return question
+            return translate_to_english(self.llm, question)
         return question
 
     def link_entities(self, q: str) -> list[dict]:
@@ -176,7 +172,10 @@ class GraphRAG:
             replaced_by=(gov["superseded_by"][0] if gov["superseded_by"] else None),
             evidence=evidence, person_to_ask=self.person(gov, gov["entity_ids"] or entity_ids),
             history=[r["decision"] for r in history], confidence=c,
-            graph=self.graph_payload(rows, {e["id"]: e["name"] for e in ents}), latency_ms=int((time.time() - t0) * 1000))
+            graph=self.graph_payload(rows, {e["id"]: e["name"] for e in ents}),
+            latency_ms=int((time.time() - t0) * 1000),
+            llm_model=self.llm.model,
+        )
 
     def person(self, gov: dict, entity_ids: list[str]) -> dict | None:
         if gov["people"]:

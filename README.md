@@ -2,27 +2,15 @@
 
 > **Connect code to the decisions that shaped it.**
 
-IntentLens answers *"why is the code like this?"* for a software repository. It ingests git history, GitHub pull requests, and source-code comments, builds a Neo4j knowledge graph that links every code entity to the engineering decision behind it, and answers natural-language questions with a cited evidence trail — refusing to guess when the graph has no answer.
-
-Built for **hackFront India · PS 01 · Neo4j track** (Best Use of Neo4j).
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Built for Nebius × NVIDIA Hackathon](https://img.shields.io/badge/Nebius_%C3%97_NVIDIA-Global_AI_Hackathon-76b900)](https://devpost.com)
+[![Track: Coding and Agentic Engineering](https://img.shields.io/badge/Track-Coding_%26_Agentic_Engineering-green)](https://devpost.com)
 
 ---
 
-## Table of Contents
-
-1. [The Problem](#the-problem)
-2. [How It Works — Five-Stage Pipeline](#how-it-works--five-stage-pipeline)
-3. [Knowledge Graph Schema](#knowledge-graph-schema)
-4. [Question-Answering Pipeline](#question-answering-pipeline)
-5. [Supersession Detection](#supersession-detection)
-6. [Confidence Scoring](#confidence-scoring)
-7. [What's in the Graph (Redis demo)](#whats-in-the-graph-redis-demo)
-8. [Tech Stack](#tech-stack)
-9. [Quick Start](#quick-start)
-10. [Project Structure](#project-structure)
-11. [API Reference](#api-reference)
-12. [Evaluation](#evaluation)
-13. [Design Principles](#design-principles)
+**Live demo:** <!-- TODO: add Render/Fly URL after deployment -->  
+**Demo video:** <!-- TODO: add YouTube URL (≤3 min) -->  
+**Repo:** https://github.com/YOUR_USERNAME/intentlens
 
 ---
 
@@ -54,6 +42,152 @@ Evidence:  E1 = Commit ae899589
 
 ---
 
+## How we use NVIDIA Nemotron and Nebius Token Factory
+
+### What runs on Nemotron
+
+**NVIDIA Nemotron 3 Ultra**, served via **Nebius Token Factory**, powers every LLM call in the IntentLens pipeline:
+
+| Pipeline stage | What Nemotron does |
+|---|---|
+| **Decision mining (Pass A + Pass B)** | Extracts engineering decisions from PR/commit threads. Two independent passes with different prompts; agreement is scored as cosine similarity of the summaries. |
+| **Supersession classification** | For each pair of decisions governing the same entity, classifies the relationship as `reinforces / refines / contradicts / unrelated`. The `contradicts` signal creates a `SUPERSEDES` edge in the graph. |
+| **Grounded answer generation** | Produces cited JSON claims from an evidence pack. Every claim must reference a valid evidence ID from the pack; claims without citations are dropped before the answer reaches the user. |
+| **Hindi/Hinglish query normalisation** | Translates non-English questions to English while preserving code identifiers, config keys, and function names exactly. |
+
+### Why Nemotron
+
+Supersession classification is the hardest task in the pipeline. Judging whether one engineering decision truly *overrides* another — rather than merely refining or restating it — requires reading both decisions, their rationale, and the alternatives they rejected, then making a precise semantic distinction. Nemotron's reasoning capability handles this reliably and produces the structured JSON output the pipeline requires.
+
+### Where Nebius Token Factory helped
+
+- **OpenAI-compatible API** — drop-in replacement for any OpenAI client; no SDK changes needed.
+- **Low-latency inference** on the interactive `/ask` path, where the answer must be generated in a single round-trip.
+- **Throughput for batch mining** across hundreds of PR/commit threads during the build pipeline.
+
+> **TODO (fill in before submission):** Add measured p50/p95 latency for `/ask` calls and throughput (threads/minute) during `make build` once you have run against the live endpoint.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    UI["React 18\n(Vercel)"]
+    API["FastAPI\n(Render)"]
+    NEO[("Neo4j AuraDB\n(cloud)")]
+    LLM["NVIDIA Nemotron 3 Ultra\nnvidia/nemotron-3-ultra-550b-a55b\nintegrate.api.nvidia.com/v1"]
+    EMB["sentence-transformers\nall-MiniLM-L6-v2\n(local, no API key)"]
+
+    UI -- "POST /ask\nGET /entity/graph" --> API
+    API -- "Cypher (parameterised)" --> NEO
+    API -- "OpenAI-compatible\nchat completions" --> LLM
+    API -- "local embed" --> EMB
+```
+
+---
+
+## Other services used
+
+- **NVIDIA API** (`integrate.api.nvidia.com/v1`) — Nemotron 3 Ultra inference (confirmed)
+- **Neo4j AuraDB** — managed cloud graph database (confirmed)
+- **Render** — backend hosting (free tier)
+- **Vercel** — frontend hosting (free tier)
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- Neo4j AuraDB free instance → [console.neo4j.io](https://console.neo4j.io)
+- Nebius Token Factory API key → [nebius.ai](https://nebius.ai) (get model URL + key from dashboard)
+- GitHub personal access token (public\_repo read scope)
+
+### 1. Clone and set up
+
+```bash
+git clone https://github.com/YOUR_USERNAME/intentlens.git
+cd intentlens
+python -m venv .venv
+.venv\Scripts\activate       # Windows
+# source .venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+```
+
+### 2. Configure
+
+```bash
+cp .env.example .env
+# Edit .env and fill in the REQUIRED values:
+#
+#   Neo4j AuraDB (from console.neo4j.io):
+#     NEO4J_URI=neo4j+s://<instance-id>.databases.neo4j.io
+#     NEO4J_USER=<instance-id>
+#     NEO4J_PASSWORD=<your-password>
+#     NEO4J_DATABASE=<instance-id>
+#
+#   NVIDIA API (from build.nvidia.com → Get API Key):
+#     LLM_BASE_URL=https://integrate.api.nvidia.com/v1
+#     LLM_API_KEY=nvapi-xxxxxxxxxxxxxxxxxxxx
+#     LLM_MODEL=nvidia/nemotron-3-ultra-550b-a55b
+#
+#   GitHub PAT (from github.com/settings/tokens, public_repo scope):
+#     GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
+### 3. Set up the graph schema
+
+```bash
+python -m scripts.apply_schema
+```
+
+### 4. Run the full data pipeline
+
+```bash
+python -m scripts.ingest          # git history + GitHub PRs
+python -m scripts.build_graph     # build graph + mine decisions via Nemotron
+python -m scripts.run_supersession  # detect supersession relationships
+```
+
+### 5. Start the app
+
+```bash
+# Terminal 1 — backend
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Terminal 2 — frontend
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** — or try **http://localhost:5173/ask?demo=1** for the one-click demo.
+
+### 6. Run the Nemotron demo (dry-run, no graph write)
+
+```bash
+python -m scripts.nemotron_demo_mining --batch-size 15
+# Results written to eval/nemotron_run.md
+```
+
+---
+
+## What's new during the hackathon submission period
+
+This project existed as an earlier build targeting a different LLM provider. The following changes were made specifically for this submission:
+
+- **Migrated the full LLM layer to Nemotron 3 Ultra on Nebius Token Factory.** Replaced the previous provider-specific client with a clean OpenAI-compatible client (`backend/app/llm/provider.py`) that targets any OpenAI-compatible endpoint via `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` env vars.
+- **Unified LLM client with exponential-backoff retries and hardened JSON parsing.** Strips `<think>…</think>` reasoning blocks, extracts the first valid JSON object from any surrounding prose, retries once with a stricter prompt on parse failure, and backs off on 429/5xx errors.
+- **Nemotron-based multilingual normalisation.** Re-implemented the Hindi/Hinglish → English translation step using the new client and a prompt that preserves code identifiers and config keys exactly.
+- **Live model badge in the UI.** The `/ask` endpoint now returns `llm_model` in the response; the `AnswerCard` component displays "Answered by Nemotron 3 Ultra on Nebius Token Factory" beneath every answer.
+- **New `scripts/nemotron_demo_mining.py`** — a standalone script that runs decision mining and supersession classification on a small batch from the existing cache and writes results to `eval/nemotron_run.md`.
+- **Licensing.** Added MIT `LICENSE` file at repo root.
+- **Updated documentation and deployment guide** — README rewritten for this hackathon; `docs/DEPLOY.md` updated with Nebius Serverless Endpoints option; all references to the previous LLM provider removed.
+- **All old-hackathon branding removed** from code, frontend copy, and documentation.
+
+---
+
 ## How It Works — Five-Stage Pipeline
 
 ```
@@ -66,7 +200,7 @@ Evidence:  E1 = Commit ae899589
   │  INGEST  │───▶│ BUILD GRAPH  │───▶│ MINE DECISIONS │
   └──────────┘    └──────────────┘    └────────────────┘
        │                 │                     │
-  git log          Neo4j AuraDB          LLM (Sarvam)
+  git log          Neo4j AuraDB          Nemotron 3 Ultra
   GitHub GraphQL   Entities, Evidence    Two-pass mining
   redis.conf       570 decisions         Quote verification
   C comments       27,249 edges          Agreement scoring
@@ -96,75 +230,21 @@ Evidence:  E1 = Commit ae899589
 | redis.conf comments | `ingest_docs.py` | `documents.jsonl` (63 blocks) |
 | C source comments | `ingest_docs.py` | `documents.jsonl` (179 blocks, rationale-filtered) |
 
-All stages write JSONL to `data/cache/` and are **resumable** — re-running adds only new records.
-
 ### Stage 2 — Build Graph
 
-Idempotent MERGE batches push all entities into Neo4j:
-
-- Commit → File/Function/ConfigKey relationships (MODIFIES)
-- PullRequest → Comment → Person relationships
-- Document → ConfigKey/Function/File (DESCRIBES)
-- REFERENCES edges from `#NNN` in commit messages
+Idempotent MERGE batches push all entities into Neo4j: Commit → File/Function/ConfigKey, PullRequest → Comment → Person, Document → ConfigKey/Function/File.
 
 ### Stage 3 — Mine Decisions
 
-For each PR thread, commit message, and Document block:
-
-```
-                    ┌─────────────────────────────────┐
-                    │         Decision Mining          │
-                    └─────────────────────────────────┘
-
-Thread text          Pass A (normal prompt)     Pass B (conservative)
-─────────────        ──────────────────────     ────────────────────
-[pr:9788]      ───▶  Extract decisions    ───┐
-(2022-01-04)                                 ├──▶  Agreement score
-Multi-Part AOF       Extract decisions    ───┘     (cosine similarity
-...                                                 of summaries)
-                              │
-                              ▼
-                     Quote verification
-                     (verbatim match in source)
-                              │
-                              ▼
-                    Verified decisions stored
-                    in Neo4j with embeddings
-```
-
-Every decision **must** include a verbatim quote from the source. Claims without valid citations are dropped before storage.
+Two-pass LLM mining via Nemotron. Every decision must include a verbatim quote from the source (verified before storage). Agreement scored as cosine similarity of summaries between Pass A and Pass B.
 
 ### Stage 4 — Supersession Detection
 
-Three signals detect when one decision overrides another:
-
-```
-┌──────────────────────────────────────────────────────────┐
-│              Supersession Detection Engine               │
-└──────────────────────────────────────────────────────────┘
-
-① STRUCTURAL          ② SEMANTIC              ③ TEMPORAL
-  (git revert)          (LLM pair classify)     (status resolution)
-
-  "This reverts        consecutive pairs       compute_statuses()
-   commit SHA"    ───▶  per entity        ───▶  ACTIVE
-                        + high-cosine           SUPERSEDED
-  → REVERTS edge        cross-entity            REVERSED
-    conf = 0.95         pairs                   UNCERTAIN
-                        classify:
-                        reinforces /
-                        refines /
-                        contradicts /
-                        unrelated
-                        → SUPERSEDES or
-                          REFINES edge
-```
-
-Result: **18 SUPERSEDES + 40 REFINES** edges across 570 decisions.
+Three signals: structural (commit revert detection), semantic (Nemotron pair classification), temporal (status resolution). Result: **18 SUPERSEDES + 40 REFINES** edges.
 
 ### Stage 5 — Answer
 
-See [Question-Answering Pipeline](#question-answering-pipeline).
+Entity linking → graph traversal → evidence pack → grounded generation with citation verification → 5-factor confidence. Refuses with reason if no decision is found or confidence < 0.35.
 
 ---
 
@@ -206,190 +286,85 @@ See [Question-Answering Pipeline](#question-answering-pipeline).
     ┌────────────────┐   └───────┬────────┘
     │   Document     │           │ EVIDENCED_BY
     │  path·text·url │◄──────────┘
-    │  source_kind   │
     └────────────────┘
-
-  Decision status values:
-  ● ACTIVE      — current answer
-  ○ SUPERSEDED  — replaced by a newer decision
-  ○ REVERSED    — explicitly reverted
-  ~ UNCERTAIN   — possible replacement, low confidence
 ```
 
 ### Relationship Types
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                    Edge Dictionary                             │
-├────────────────────────┬───────────────────────────────────────┤
-│ GOVERNS                │ Decision ──► Entity                   │
-│                        │ "this decision applies to this entity" │
-├────────────────────────┼───────────────────────────────────────┤
-│ EVIDENCED_BY           │ Decision ──► Commit/PR/Comment/Doc    │
-│                        │ "this source supports the decision"   │
-├────────────────────────┼───────────────────────────────────────┤
-│ MODIFIES               │ Commit ──► File/Function/ConfigKey    │
-│                        │ "this commit changed this entity"     │
-├────────────────────────┼───────────────────────────────────────┤
-│ SUPERSEDES             │ Decision ──► Decision                 │
-│                        │ "newer overrides older"               │
-├────────────────────────┼───────────────────────────────────────┤
-│ REFINES                │ Decision ──► Decision                 │
-│                        │ "newer extends without overriding"    │
-├────────────────────────┼───────────────────────────────────────┤
-│ REVERTS                │ Decision ──► Decision                 │
-│                        │ "structural git revert"               │
-├────────────────────────┼───────────────────────────────────────┤
-│ DESCRIBES              │ Document ──► Entity                   │
-│                        │ "comment block explains this entity"  │
-├────────────────────────┼───────────────────────────────────────┤
-│ AUTHORED               │ Person ──► Commit/PR/Decision         │
-├────────────────────────┼───────────────────────────────────────┤
-│ MADE_BY                │ Decision ──► Person                   │
-├────────────────────────┼───────────────────────────────────────┤
-│ PART_OF                │ Commit ──► PullRequest                │
-├────────────────────────┼───────────────────────────────────────┤
-│ REFERENCES             │ Commit/PR ──► Issue/PR                │
-└────────────────────────┴───────────────────────────────────────┘
-```
+| Relationship | Direction | Meaning |
+|---|---|---|
+| GOVERNS | Decision → Entity | This decision applies to this code entity |
+| EVIDENCED_BY | Decision → Commit/PR/Comment/Doc | This source supports the decision |
+| MODIFIES | Commit → Entity | This commit changed this entity |
+| SUPERSEDES | Decision → Decision | Newer overrides older |
+| REFINES | Decision → Decision | Newer extends without overriding |
+| REVERTS | Decision → Decision | Structural git revert |
+| DESCRIBES | Document → Entity | Comment block explains this entity |
+| AUTHORED | Person → Commit/PR | Authorship |
+| MADE_BY | Decision → Person | Person approved the decision |
+| PART_OF | Commit → PullRequest | Commit belongs to this PR |
+| REFERENCES | Commit/PR → Issue | `#NNN` reference |
 
 ---
 
 ## Question-Answering Pipeline
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   POST /ask  Pipeline                           │
-└─────────────────────────────────────────────────────────────────┘
-
 User question
      │
-     ▼
-┌────────────────────────────────────┐
-│  1. Language normalisation          │  Hindi/Hinglish → English
-│     (Sarvam AI translation)         │  code identifiers preserved
-└────────────────┬───────────────────┘
-                 │
-                 ▼
-┌────────────────────────────────────┐
-│  2. Entity linking                  │  exact: "repl-backlog-size"
-│     exact match → fulltext search   │  fuzzy: entity_names index
-└────────────────┬───────────────────┘
-                 │
-         ┌───────┴────────┐
-         │ entities found? │
-         └───────┬────────┘
-              yes│             no
-                 ▼             ▼
-┌───────────────────┐  ┌──────────────────────┐
-│ 3a. Graph hop 1   │  │ 3b. Vector fallback   │
-│ GOVERNS traversal │  │ decision_embedding    │
-│ (parameterised    │  │ cosine similarity     │
-│  Cypher only)     │  │ (hop 2)               │
-└─────────┬─────────┘  └──────────┬────────────┘
-          └──────────┬────────────┘
-                     │
-                     ▼
-┌────────────────────────────────────┐
-│  4. Supersession check              │  SUPERSEDED/REVERSED →
-│     promote replacement             │  fetch & show replacement
-└────────────────┬───────────────────┘
-                 │
-                 ▼
-┌────────────────────────────────────┐
-│  5. Select governing decision       │  latest ACTIVE/UNCERTAIN
-│     build evidence pack  E1..E8     │  sort by date
-└────────────────┬───────────────────┘
-                 │
-                 ▼
-┌────────────────────────────────────┐
-│  6. Grounded generation             │  LLM returns JSON claims
-│     citation verification           │  each claim must cite E-ref
-│     invalid citations dropped       │  from the pack
-└────────────────┬───────────────────┘
-                 │
-                 ▼
-┌────────────────────────────────────┐
-│  7. Confidence scoring              │  5 graph-derived factors
-│     (never LLM self-rating)         │  see below
-└────────────────┬───────────────────┘
-                 │
-         ┌───────┴────────┐
-         │ score ≥ 0.35?  │
-         └───────┬────────┘
-              yes│             no
-                 ▼             ▼
-           ANSWERED          REFUSED
-           with evidence      + last changers
-                              + closest discussions
-                              + person to ask
+     ▼  [1] Language normalisation (Nemotron: Hindi/Hinglish → English)
+     │
+     ▼  [2] Entity linking (exact + full-text index)
+     │
+     ├── entities found → [3a] GOVERNS traversal (hop 1)
+     └── not found     → [3b] Vector fallback, decision_embedding (hop 2)
+                               │
+                               ▼
+                        [4] Supersession check → promote replacement
+                               │
+                               ▼
+                        [5] Select governing decision, build evidence pack E1..E8
+                               │
+                               ▼
+                        [6] Nemotron grounded generation (JSON claims, each citing E-ref)
+                               │
+                               ▼
+                        [7] 5-factor confidence (graph-derived, never LLM self-rating)
+                               │
+                        score ≥ 0.35? → ANSWERED with evidence trail
+                        score < 0.35? → REFUSED + last changers + person to ask
 ```
 
 ---
 
 ## Supersession Detection
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Example: repl-diskless-sync default change                  │
-└──────────────────────────────────────────────────────────────┘
+Three signals detect when one decision overrides another:
 
-  2014-10-24                    2022-01-17
-  ┌──────────────────────┐      ┌────────────────────────────┐
-  │ "Diskless replication │      │ "Set repl-diskless-sync    │
-  │  documented in        │      │  to yes by default"        │
-  │  redis.conf (no=off)" │      │  (#10092)                  │
-  │                       │      │                            │
-  │  status: SUPERSEDED   │◄─────│  status: ACTIVE            │
-  └──────────────────────┘      └────────────────────────────┘
-           SUPERSEDES edge,  confidence=1.00
-           reason: "NEWER changes the default from no to yes,
-                    directly contradicting OLDER"
+1. **Structural** — commit messages matching `"This reverts commit SHA"` → REVERTS edge, confidence 0.95
+2. **Semantic** — Nemotron classifies consecutive pairs per entity + high-cosine cross-entity pairs as `reinforces / refines / contradicts / unrelated`
+3. **Temporal** — `compute_statuses()` applies precedence: `SUPERSEDED/REVERSED > UNCERTAIN > ACTIVE`
 
-  Query result:
-  ┌──────────────────────────────────────────────────────────┐
-  │ ⚠ SUPERSEDED NOTICE                                      │
-  │ The earlier decision "Diskless documented as no" (2014)  │
-  │ was superseded on 2022-01-17.                            │
-  │ Showing the CURRENT decision.                            │
-  └──────────────────────────────────────────────────────────┘
-  CURRENT: "Set repl-diskless-sync to yes by default"
-  HISTORY: ~~"Diskless replication documented as no"~~
-```
+Result: 18 SUPERSEDES + 40 REFINES edges. 14 decisions marked non-ACTIVE.
 
 ---
 
 ## Confidence Scoring
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│           Confidence = Σ weight_i × factor_i                 │
-└──────────────────────────────────────────────────────────────┘
+score = 0.30 × Directness + 0.25 × Corroboration + 0.20 × Agreement
+      + 0.15 × Currency   + 0.10 × Distance
 
-  Factor          Weight   Value formula
-  ─────────────── ──────   ──────────────────────────────────────
-  Directness       30%     1.0 if explicit rationale in source
-                           0.5 if rationale is inferred
-
-  Corroboration    25%     0.4 = 1 source type
-                           0.7 = 2 source types
-                           1.0 = 3+ source types
-
-  Agreement        20%     cosine(summary_passA, summary_passB)
-                           two independent LLM mining passes
-
-  Currency         15%     1 − min(1, drift_commits / 5)
-                           how many commits touched entity
-                           after decision without a new decision
-
-  Distance         10%     1 − (hops − 1) / MAX_GRAPH_HOPS
-                           hop 1 = direct GOVERNS match
-                           hop 2 = vector similarity match
-
-  ─────────────────────────────────────────────────────────────
-  Thresholds:   High ≥ 0.75  ·  Medium ≥ 0.55  ·  Low ≥ 0.35
-                Below 0.35 → REFUSED (never guesses)
+Thresholds:  High ≥ 0.75  ·  Medium ≥ 0.55  ·  Low ≥ 0.35  ·  Below 0.35 → REFUSED
 ```
+
+| Factor | Weight | Formula |
+|---|---|---|
+| Directness | 30% | 1.0 if explicit rationale stated; 0.5 if inferred |
+| Corroboration | 25% | 0.4 one source · 0.7 two · 1.0 three+ source types |
+| Agreement | 20% | cosine(summary_passA, summary_passB) |
+| Currency | 15% | 1 − min(1, drift\_commits / 5) |
+| Distance | 10% | 1 − (hops − 1) / MAX\_GRAPH\_HOPS |
 
 ---
 
@@ -400,19 +375,19 @@ The demo loads the **replication and persistence subsystem** of `redis/redis`:
 
 ### Node counts
 
-| Label | Count | Description |
-|-------|------:|-------------|
-| Decision | **570** | Mined engineering decisions |
-| Comment | 8,502 | PR and issue comments |
-| Document | 2,478 | Config + code comment blocks |
-| Commit | 1,372 | Subsystem-touching commits |
-| Person | 554 | Authors and contributors |
-| PullRequest | 321 | GitHub pull requests |
-| Function | 282 | C functions |
-| ConfigKey | 222 | `redis.conf` settings |
-| Issue | 43 | GitHub issues |
-| File | 4 | Source files |
-| **Total** | **14,348** | |
+| Label | Count |
+|-------|------:|
+| Decision | **570** |
+| Comment | 8,502 |
+| Document | 2,478 |
+| Commit | 1,372 |
+| Person | 554 |
+| PullRequest | 321 |
+| Function | 282 |
+| ConfigKey | 222 |
+| Issue | 43 |
+| File | 4 |
+| **Total** | **14,348** |
 
 ### Relationship counts
 
@@ -430,21 +405,7 @@ The demo loads the **replication and persistence subsystem** of `redis/redis`:
 | SUPERSEDES | 18 |
 | **Total** | **27,249** |
 
-### Decision sources
-
-```
-  pr_or_commit  ████████████████████████████████████████  503  (88%)
-  document      ███████                                    67  (12%)
-```
-
-### Decision status
-
-```
-  ACTIVE      ████████████████████████████████████████  556  (97.5%)
-  SUPERSEDED  █                                          14   (2.5%)
-```
-
-### Three demo questions (confirmed live)
+### Three demo questions
 
 | State | Question | Confidence |
 |-------|----------|-----------|
@@ -452,104 +413,39 @@ The demo loads the **replication and persistence subsystem** of `redis/redis`:
 | ⚠ **SUPERSEDED** | Why does Redis fail to start by default when a requested bind address is not available? | High (0.91) |
 | ❌ **REFUSED** | What design decision explains why `updateSlavesWaitingBgsave` uses its current implementation strategy? | No answer |
 
-The SUPERSEDED question surfaces the older decision ("`Add '-' prefix to allow EADDRNOTAVAIL to be ignored`") struck through in history, plus a superseded notice with the current decision.
-
-The REFUSED question demonstrates honest refusal: `updateSlavesWaitingBgsave` has 37 commits but no mined decision, so IntentLens returns last changers and related discussions instead of guessing.
-
 ---
 
 ## Tech Stack
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                      Technology Stack                        │
-└──────────────────────────────────────────────────────────────┘
+DATA LAYER
+├── Neo4j AuraDB (Cypher 5)         knowledge graph + vector index
+├── PyDriller                        git history traversal
+└── GitHub GraphQL API               PR / issue ingestion
 
-  DATA LAYER
-  ├── Neo4j AuraDB (Cypher 5)   knowledge graph + vector index
-  ├── PyDriller                  git history traversal
-  └── GitHub GraphQL API         PR / issue ingestion
+AI LAYER
+├── NVIDIA Nemotron 3 Ultra          LLM: mining, answering, normalisation
+│   via Nebius Token Factory         OpenAI-compatible, exponential-backoff retries
+├── sentence-transformers            all-MiniLM-L6-v2 (384d, local — no API call)
+└── Two-pass mining                  agreement scoring via cosine similarity
 
-  AI LAYER
-  ├── Sarvam AI sarvam-105b      LLM for mining + answering
-  │                              + Hindi/Hinglish translation
-  ├── sentence-transformers      all-MiniLM-L6-v2 (384d embeds)
-  └── Two-pass mining            agreement scoring via cosine sim
+BACKEND
+├── FastAPI + Pydantic v2            REST API (8 endpoints)
+├── Parameterised Cypher only        no LLM-generated queries
+└── 5-factor confidence              graph-derived, not self-rated
 
-  BACKEND
-  ├── FastAPI + Pydantic v2       REST API (8 endpoints)
-  ├── Parameterised Cypher only  no LLM-generated queries
-  └── 5-factor confidence        graph-derived, not self-rated
-
-  FRONTEND
-  ├── React 18 + Vite             SPA with lazy-loaded routes
-  ├── @neo4j-nvl/react            interactive graph explorer
-  ├── Fraunces + Outfit fonts     evidence trail design system
-  └── WCAG AA contrast            dark/light theme, 375px+
+FRONTEND
+├── React 18 + Vite                  SPA with lazy-loaded routes
+├── @neo4j-nvl/react                 interactive graph explorer
+├── Fraunces + Outfit fonts          evidence trail design system
+└── WCAG AA contrast                 dark/light theme, 375px+
 ```
 
 ---
 
-## Quick Start
+## Quick Start (recap)
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- Neo4j AuraDB free instance → [console.neo4j.io](https://console.neo4j.io)
-- Sarvam AI API key → [sarvam.ai](https://sarvam.ai)
-- GitHub personal access token (public_repo read scope)
-
-### 1. Clone and set up
-
-```bash
-git clone https://github.com/YOUR_USERNAME/intentlens.git
-cd intentlens
-python -m venv .venv
-.venv/Scripts/activate       # Windows
-# source .venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-```
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-# Fill in your Neo4j, Sarvam, and GitHub credentials
-```
-
-### 3. Set up the graph schema
-
-```bash
-python -m scripts.apply_schema
-```
-
-### 4. Run the full data pipeline
-
-```bash
-# Ingest git history + GitHub PRs (resumable)
-python -m scripts.ingest
-
-# Build the knowledge graph + mine decisions
-python -m scripts.build_graph
-
-# Detect supersession relationships
-python -m scripts.run_supersession
-```
-
-### 5. Start the app
-
-```bash
-# Terminal 1 — backend
-python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
-
-# Terminal 2 — frontend
-cd frontend
-npm install
-npm run dev
-```
-
-Open **http://localhost:5173** — or try **http://localhost:5173/ask?demo=1** for the one-click demo.
+See the full [Quick Start](#quick-start) section above.
 
 ---
 
@@ -557,61 +453,33 @@ Open **http://localhost:5173** — or try **http://localhost:5173/ask?demo=1** f
 
 ```
 intentlens/
-├── backend/
-│   └── app/
-│       ├── config.py              settings from .env
-│       ├── models.py              Pydantic models
-│       ├── main.py                FastAPI app (8 endpoints)
-│       ├── ingestion/
-│       │   ├── git_ingest.py      PyDriller git history
-│       │   ├── github_ingest.py   GitHub GraphQL PRs
-│       │   └── doc_ingest.py      doc section chunker
-│       ├── extraction/
-│       │   ├── entities.py        config keys, functions, refs
-│       │   └── decision_miner.py  LLM mining + verification
-│       ├── graph/
-│       │   ├── db.py              Neo4j driver wrapper
-│       │   ├── loader.py          idempotent MERGE loaders
-│       │   └── schema.cypher      constraints + indexes
-│       ├── reasoning/
-│       │   ├── supersession.py    3-signal engine
-│       │   └── confidence.py      5-factor scorer
-│       └── retrieval/
-│           ├── cypher.py          parameterised templates
-│           └── graphrag.py        full QA pipeline
-├── frontend/
-│   └── src/
-│       ├── pages/
-│       │   ├── Landing.jsx        hero + live stats
-│       │   ├── Ask.jsx            question workspace
-│       │   ├── Explore.jsx        NVL graph explorer
-│       │   ├── How.jsx            pipeline + schema docs
-│       │   ├── Results.jsx        evaluation table
-│       │   └── About.jsx          project info
-│       ├── components/
-│       │   ├── AnswerCard.jsx     answered/superseded/refused
-│       │   ├── GraphView.jsx      NVL wrapper + side panel
-│       │   └── ...
-│       └── demoQuestions.js       5 verified demo questions
+├── backend/app/
+│   ├── config.py                settings (LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, ...)
+│   ├── models.py                Pydantic models (AnswerResponse includes llm_model)
+│   ├── main.py                  FastAPI app (8 endpoints, /ready pings LLM)
+│   ├── llm/provider.py          OpenAI-compatible client for Nebius Token Factory
+│   ├── ingestion/               git_ingest.py, github_ingest.py, doc_ingest.py
+│   ├── extraction/              entities.py, decision_miner.py
+│   ├── graph/                   db.py, schema.cypher, loader.py
+│   ├── reasoning/               supersession.py, confidence.py
+│   └── retrieval/               cypher.py, graphrag.py
+├── frontend/src/
+│   ├── pages/                   Landing, Ask, Explore, How, Results, About
+│   ├── components/              AnswerCard (with model badge), GraphView, ...
+│   └── api.js                   reads VITE_API_BASE_URL
 ├── scripts/
-│   ├── ingest.py                  run all ingestion stages
-│   ├── build_graph.py             load + mine decisions
-│   ├── run_supersession.py        detect supersession
-│   ├── ingest_docs.py             extract rationale comments
-│   └── full_build.py              end-to-end orchestration
+│   ├── nemotron_demo_mining.py  Nemotron demo run → eval/nemotron_run.md
+│   ├── build_graph.py           load + mine decisions
+│   ├── run_supersession.py      detect supersession
+│   └── run_eval.py              evaluation harness
 ├── eval/
-│   ├── supersession_found.md      58 supersession edges
-│   ├── build_summary.md           graph statistics
-│   └── source_audit.md            source quality analysis
+│   ├── nemotron_run.md          Nemotron demo run output (generated)
+│   └── gold_questions.json      45-question gold set
 ├── docs/
-│   ├── ARCHITECTURE.md            detailed technical design
-│   └── EVALUATION.md              evaluation methodology
-├── data/
-│   ├── cache/                     JSONL cache (gitignored)
-│   └── repo/                      cloned redis/redis (gitignored)
-├── .env.example                   credential template
-├── .gitignore
-└── README.md                      this file
+│   ├── DEPLOY.md                Render + Vercel + Nebius Serverless guide
+│   └── EVALUATION_RESULTS.md   generated by make eval
+├── LICENSE                      MIT 2026
+└── README.md                    this file
 ```
 
 ---
@@ -620,40 +488,25 @@ intentlens/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/ask` | Ask a "why" question, get a cited answer |
+| `POST` | `/ask` | Ask a "why" question; response includes `llm_model` field |
 | `GET` | `/entity/graph?id=` | Decision neighbourhood for an entity |
 | `GET` | `/entities/search?q=` | Autocomplete entity search |
-| `GET` | `/stats` | Live graph counts for the landing page |
+| `GET` | `/stats` | Live graph counts |
 | `GET` | `/eval/results` | Parsed evaluation results |
 | `GET` | `/health` | Liveness probe |
-| `GET` | `/ready` | Readiness probe (Neo4j + LLM) |
+| `GET` | `/ready` | Readiness probe (Neo4j + LLM ping) |
 
-### POST /ask — example
-
-```bash
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "Why does Redis use a shared replication buffer?"}'
-```
-
-Response shape:
+### POST /ask — example response shape
 
 ```json
 {
   "status": "answered",
   "answer": "Redis uses a shared replication buffer to reduce...[E1]",
-  "decision": {
-    "title": "Replication backlog and replicas use one global shared buffer",
-    "status": "ACTIVE",
-    "decided_on": "2021-10-25",
-    "rationale": "Per-replica output buffers caused high memory usage..."
-  },
-  "superseded_notice": null,
-  "evidence": [
-    { "ref": "E1", "kind": "Commit", "url": "...", "quote": "..." }
-  ],
+  "decision": { "title": "...", "status": "ACTIVE", "decided_on": "2021-10-25" },
+  "evidence": [{ "ref": "E1", "kind": "Commit", "url": "...", "quote": "..." }],
   "confidence": { "score": 0.82, "label": "High" },
-  "person_to_ask": { "name": "Oran Agra", "reason": "Most commits" }
+  "llm_model": "nvidia/Llama-3_1-Nemotron-Ultra-253B-v1",
+  "latency_ms": 1240
 }
 ```
 
@@ -672,8 +525,6 @@ IntentLens is compared against a **vector-RAG baseline** (top-5 comments by embe
 | Links to author / person to ask | ❌ | ✅ |
 | Hindi/Hinglish questions | ❌ | ✅ |
 
-Run the evaluation harness:
-
 ```bash
 python -m scripts.run_eval
 ```
@@ -682,33 +533,39 @@ python -m scripts.run_eval
 
 ## Design Principles
 
-1. **Every answer carries evidence.** No sentence is shown without citing at least one evidence ID from the graph. Claims without valid citations are dropped before the answer reaches you.
-
-2. **Supersession is honoured.** A decision with status `SUPERSEDED` or `REVERSED` is never presented as the current answer. It appears only in history, with a link to its replacement.
-
-3. **Refusal is a feature.** If no decision governs the entity within `MAX_GRAPH_HOPS`, or confidence is below `REFUSAL_THRESHOLD` (0.35), the system refuses and tells you who to ask instead.
-
-4. **Confidence is computed from graph facts.** The LLM never self-rates its own answer. Five graph-derived factors (directness, corroboration, agreement, currency, distance) produce a score independent of the model's self-confidence.
-
-5. **The LLM never writes Cypher.** All graph queries are parameterised templates in `retrieval/cypher.py`. No free-form query generation, ever.
+1. **Every answer carries evidence.** No sentence is shown without citing at least one evidence ID from the graph.
+2. **Supersession is honoured.** A `SUPERSEDED` or `REVERSED` decision is never presented as the current answer.
+3. **Refusal is a feature.** Below `REFUSAL_THRESHOLD` (0.35) or no decision within `MAX_GRAPH_HOPS`, the system refuses and says why.
+4. **Confidence is computed from graph facts.** The LLM never self-rates its own answer.
+5. **The LLM never writes Cypher.** All graph queries are parameterised templates in `retrieval/cypher.py`.
 
 ---
 
-## Hackathon Context
+## Hackathon Submission Details
 
-- **Event:** hackFront India
-- **Theme:** AI and Developer Tools
-- **Problem statement:** PS 01 — "Why The Code Is Like This"
-- **Track:** Neo4j (Best Use of Neo4j)
-- **Demo repo:** redis/redis, subsystem: replication + persistence
+| Field | Value |
+|---|---|
+| Event | Nebius × NVIDIA Global AI Hackathon |
+| Track | Coding and Agentic Engineering |
+| LLM | NVIDIA Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b`) |
+| Inference endpoint | `https://integrate.api.nvidia.com/v1` |
+| Graph DB | Neo4j AuraDB |
+| Embeddings | sentence-transformers all-MiniLM-L6-v2 (local) |
 
 ---
 
-*Built with Neo4j AuraDB · Sarvam AI · FastAPI · React 18*
+## Feedback on Nebius Token Factory and NVIDIA Tools
+
+> **TODO (fill in before submitting):**
+> - What worked well with Nebius Token Factory (API compatibility, latency, reliability)?
+> - What was rough or missing (docs, rate limits, model selection, dashboard UX)?
+> - Suggestions for improvement?
+> - What worked well with Nemotron 3 Ultra specifically (reasoning quality, JSON output, structured prompts)?
+> - Any issues with the model (hallucinations, token limits, think-block verbosity)?
 
 ---
 
-## Diagrams (GitHub renders these automatically)
+## Mermaid Diagrams
 
 ### Pipeline Flow
 
@@ -719,22 +576,18 @@ flowchart LR
         GH[GitHub PRs\nGraphQL]
         D[redis.conf\nC comments]
     end
-
     subgraph Build["② Build Graph"]
         NEO[(Neo4j\nAuraDB)]
     end
-
     subgraph Mine["③ Mine Decisions"]
-        LLM[Sarvam AI\nLLM]
+        LLM[Nemotron 3 Ultra\nNebius Token Factory]
         QV{Quote\nverify}
     end
-
     subgraph Sup["④ Supersession"]
         S1[Structural\nreverts]
-        S2[Semantic\nLLM pairs]
+        S2[Semantic\nNemotron pairs]
         S3[Temporal\nresolution]
     end
-
     subgraph Answer["⑤ Answer"]
         EL[Entity\nlinking]
         TR[Graph\ntraversal]
@@ -755,180 +608,38 @@ flowchart LR
     NEO --> EL --> TR --> EP --> GEN --> CONF
 ```
 
----
-
 ### Knowledge Graph Schema
 
 ```mermaid
 erDiagram
-    Person {
-        string id
-        string name
-    }
-    Commit {
-        string id
-        string message
-        string date
-        string author
-    }
-    PullRequest {
-        string id
-        int number
-        string title
-        string body
-    }
-    Decision {
-        string id
-        string title
-        string summary
-        string rationale
-        string status
-        float  agreement
-        float  embedding
-    }
-    Entity {
-        string id
-        string name
-        string path
-    }
-    Document {
-        string id
-        string path
-        string text
-        string source_kind
-    }
-    Comment {
-        string id
-        string body
-        float  embedding
-    }
+    Person { string id; string name }
+    Commit { string id; string message; string date }
+    PullRequest { string id; int number; string title }
+    Decision { string id; string title; string status; float agreement }
+    Entity { string id; string name; string path }
+    Document { string id; string path; string text }
+    Comment { string id; string body; float embedding }
 
     Person ||--o{ Commit       : "AUTHORED"
     Person ||--o{ PullRequest  : "AUTHORED"
-    Person ||--o{ Decision     : "MADE_BY"
     Commit ||--o{ Entity       : "MODIFIES"
     Commit }o--|| PullRequest  : "PART_OF"
     Decision ||--o{ Entity     : "GOVERNS"
     Decision ||--o{ Commit     : "EVIDENCED_BY"
     Decision ||--o{ PullRequest: "EVIDENCED_BY"
-    Decision ||--o{ Document   : "EVIDENCED_BY"
     Decision ||--o{ Decision   : "SUPERSEDES"
     Decision ||--o{ Decision   : "REFINES"
     Document ||--o{ Entity     : "DESCRIBES"
     Comment  }o--|| PullRequest: "COMMENTED_ON"
 ```
 
----
-
-### Question-Answering Flow
-
-```mermaid
-flowchart TD
-    Q([User question]) --> NORM[Normalise language\nSarvam translation]
-    NORM --> EL[Entity linking\nexact + fulltext]
-    EL --> HOP1{Entities\nfound?}
-
-    HOP1 -->|Yes| GRAPH[Graph hop 1\nGOVERNS traversal]
-    HOP1 -->|No| VEC[Vector fallback\ndecision_embedding]
-
-    GRAPH --> ROWS{Results?}
-    VEC --> ROWS
-
-    ROWS -->|None| REFUSE[REFUSED\n+ last changers\n+ person to ask]
-    ROWS -->|Found| SUP[Supersession check\npromote replacement]
-
-    SUP --> SELECT[Select governing decision\nlatest ACTIVE/UNCERTAIN]
-    SELECT --> PACK[Build evidence pack\nE1..E8]
-    PACK --> GEN[LLM grounded generation\nclaims must cite E-ref]
-    GEN --> VERIFY{Citations\nvalid?}
-
-    VERIFY -->|No| DROP[Drop claim]
-    VERIFY -->|Yes| SCORE[5-factor confidence\ngraph-derived]
-
-    SCORE --> THRESH{score ≥ 0.35?}
-    THRESH -->|No| REFUSE
-    THRESH -->|Yes| ANSWER([ANSWERED\nwith evidence trail])
-
-    style REFUSE fill:#6e7681,color:#fff
-    style ANSWER fill:#3fb950,color:#fff
-    style DROP   fill:#f85149,color:#fff
-```
-
----
-
-### Supersession State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> ACTIVE : Decision created
-
-    ACTIVE --> UNCERTAIN : Low-confidence\nSUPERSEDES link\n(conf < 0.6)
-
-    ACTIVE --> SUPERSEDED : High-confidence\nSUPERSEDES link\n(conf ≥ 0.6)
-
-    ACTIVE --> REVERSED : REVERTS edge\n(structural: git revert\nconf = 0.95)
-
-    UNCERTAIN --> SUPERSEDED : Confirmed by\nanother signal
-
-    note right of ACTIVE : Shown as current answer
-    note right of SUPERSEDED : Shown struck-through\nin history
-    note right of REVERSED : Shown struck-through\nin history
-    note right of UNCERTAIN : Shown with\n"possibly superseded" notice
-```
-
----
-
-### Confidence Formula
-
-```mermaid
-xychart-beta
-    title "Confidence factor weights"
-    x-axis ["Directness", "Corroboration", "Agreement", "Currency", "Distance"]
-    y-axis "Weight (%)" 0 --> 35
-    bar [30, 25, 20, 15, 10]
-```
-
----
-
-### Graph Statistics (Redis demo)
-
-```mermaid
-pie title Node types in IntentGraph
-    "Comment" : 8502
-    "Document" : 2478
-    "Person" : 554
-    "Commit" : 1372
-    "Decision" : 570
-    "PullRequest" : 321
-    "Function" : 282
-    "ConfigKey" : 222
-    "Issue" : 43
-    "File" : 4
-```
-
-```mermaid
-pie title Decision sources
-    "PR / commit threads" : 503
-    "Source code comments" : 67
-```
-
-```mermaid
-pie title Decision status
-    "ACTIVE" : 556
-    "SUPERSEDED" : 14
-```
-
----
-
 ### Three Demo Question States
 
 ```mermaid
 flowchart LR
     Q1["🟢 ANSWERED\nMulti-Part AOF rationale\nHigh confidence 0.78\nEvidence: Commit #9788"]
-
-    Q2["🟡 SUPERSEDED\nBind address default\nHigh confidence 0.91\nOlder decision struck through\nin history with notice"]
-
-    Q3["🔴 REFUSED\nupdateSlavesWaitingBgsave\n37 commits, no Decision\nShows: last changers +\nrelated discussions"]
+    Q2["🟡 SUPERSEDED\nBind address default\nHigh confidence 0.91\nOlder decision struck through"]
+    Q3["🔴 REFUSED\nupdateSlavesWaitingBgsave\n37 commits, no Decision\nShows last changers"]
 
     style Q1 fill:#3fb950,color:#fff
     style Q2 fill:#d29922,color:#fff

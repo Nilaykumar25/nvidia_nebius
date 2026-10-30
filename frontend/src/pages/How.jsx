@@ -18,7 +18,7 @@ function Section({ id, title, children }) {
 const PIPELINE_STEPS = [
   { id: 'ingest',     label: 'Ingest',              sub: 'git · GitHub · docs' },
   { id: 'graph',      label: 'Build graph',          sub: 'Neo4j AuraDB' },
-  { id: 'mine',       label: 'Mine decisions',       sub: 'LLM + quote verifier' },
+  { id: 'mine',       label: 'Mine decisions',       sub: 'Nemotron + quote verifier' },
   { id: 'supersede',  label: 'Detect supersession',  sub: '3-signal engine' },
   { id: 'answer',     label: 'Answer',               sub: '5-factor confidence' },
 ]
@@ -312,7 +312,7 @@ const QUESTION_STEPS = [
   {
     n: '1',
     title: 'Normalise language',
-    body: 'Hindi or Hinglish questions are translated to English by Sarvam AI before any further processing. Code identifiers are preserved unchanged.',
+    body: 'Hindi or Hinglish questions are translated to English by Nemotron 3 Ultra (via Nebius Token Factory) before any further processing. Code identifiers, config keys, and function names are preserved unchanged.',
   },
   {
     n: '2',
@@ -376,7 +376,7 @@ export default function How() {
             {[
               { label: 'Ingest', body: 'Git history (via PyDriller) and GitHub PRs/issues (GraphQL API) are cached as JSONL. Design docs and redis.conf comment blocks are extracted as Document nodes. All stages are resumable.' },
               { label: 'Build graph', body: 'Idempotent MERGE batches push Commits, Persons, Files, Functions, ConfigKeys, PullRequests, Issues, Comments, and Documents into Neo4j AuraDB. REFERENCES edges link commits to the issues they mention.' },
-              { label: 'Mine decisions', body: 'Each PR thread and substantial commit message is sent to Sarvam AI twice (normal prompt + conservative prompt). Extracted decisions must have at least one verbatim quote verifiable in the source. Agreement is scored as embedding cosine similarity between the two passes.' },
+              { label: 'Mine decisions', body: 'Each PR thread and substantial commit message is sent to Nemotron 3 Ultra (via Nebius Token Factory) twice — a normal prompt and a conservative prompt. Extracted decisions must have at least one verbatim quote verifiable in the source. Agreement is scored as embedding cosine similarity between the two passes.' },
               { label: 'Detect supersession', body: 'Three signals: structural (commit revert detection), semantic (LLM pair classification of consecutive decisions per entity), and high-similarity cross-entity pairs. Status resolution applies precedence: SUPERSEDED/REVERSED > UNCERTAIN > ACTIVE.' },
               { label: 'Answer with confidence', body: 'Entity linking, graph traversal, evidence assembly, grounded generation with citation verification, and a five-factor confidence score. The system refuses — and says so — when the graph has no answer.' },
             ].map(({ label, body }, i) => (

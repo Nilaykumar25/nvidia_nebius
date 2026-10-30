@@ -219,7 +219,7 @@ export default function Results() {
 
                 <div className="results-method-block">
                   <h3 className="results-method-block__title">Systems compared</h3>
-                  <p>Both systems use the same loaded graph, the same LLM (Sarvam sarvam-105b), and the same gold questions.</p>
+                  <p>Both systems use the same loaded graph, the same LLM (Nemotron 3 Ultra via Nebius Token Factory), and the same gold questions.</p>
                   <dl className="results-method-systems">
                     <div>
                       <dt>Vector-RAG baseline</dt>

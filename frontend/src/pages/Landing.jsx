@@ -14,7 +14,7 @@ function Hero() {
     <section className="hero" aria-labelledby="hero-heading">
       <div className="container hero__inner">
         <div className="hero__copy">
-          <p className="hero__eyebrow">hackFront India · PS 01 · Neo4j track</p>
+          <p className="hero__eyebrow">Nebius × NVIDIA Global AI Hackathon · Coding and Agentic Engineering</p>
           <h1 id="hero-heading" className="hero__heading">
             Connect code to the decisions that shaped it.
           </h1>
@@ -295,7 +295,7 @@ function LiveStats() {
 const BUILT_ON = [
   { name: 'Neo4j AuraDB', role: 'Knowledge graph' },
   { name: 'GraphRAG', role: 'Graph-first retrieval' },
-  { name: 'Sarvam AI', role: 'LLM + Hindi/Hinglish' },
+  { name: 'NVIDIA Nemotron 3 Ultra', role: 'LLM via Nebius Token Factory' },
   { name: 'FastAPI', role: 'Backend API' },
   { name: 'React 18', role: 'Frontend' },
 ]
@@ -318,34 +318,33 @@ function BuiltOn() {
   )
 }
 
-/* ── Section 7: Why Indian engineering teams ─────────────
+/* ── Section 7: Powered by NVIDIA Nemotron ───────────────
    Factual and modest. No invented claims.
    -------------------------------------------------------- */
-function IndiaSection() {
+function NvidiaSection() {
   return (
-    <section className="india-section" aria-labelledby="india-heading">
+    <section className="india-section" aria-labelledby="nvidia-heading">
       <div className="container">
         <div className="india-section__inner">
           <div className="india-section__copy">
-            <h2 id="india-heading" className="india-section__heading">
-              Built with Indian engineering teams in mind.
+            <h2 id="nvidia-heading" className="india-section__heading">
+              Powered by NVIDIA Nemotron 3 Ultra on Nebius Token Factory.
             </h2>
             <p>
-              High attrition, distributed teams, and large legacy codebases are structural
-              features of Indian software engineering — not edge cases.
-              When senior engineers leave, the reasoning behind architectural choices
-              goes with them. Onboarding slows. Refactors break things that nobody
-              knew were load-bearing.
+              Every LLM call in IntentLens — two-pass decision mining, supersession pair
+              classification, grounded answer generation, and multilingual query
+              normalisation — runs through Nemotron 3 Ultra served via Nebius Token Factory.
             </p>
             <p>
-              IntentLens keeps that reasoning in the graph, tied to the actual commits
-              and PRs that contain it. A new joiner can ask why a configuration key
-              exists and get an answer that cites the original discussion,
-              not a guess from a stale wiki page.
+              Nemotron's strong reasoning capability is critical for the supersession
+              classification task: judging whether one engineering decision truly overrides
+              another requires reading both decisions and their rationale, then making a
+              precise semantic distinction between "refines", "contradicts", and "unrelated".
             </p>
             <p>
-              The Sarvam integration means questions can be asked in
-              Hinglish or Hindi — because not every engineer writes queries in English.
+              Questions can be asked in Hinglish or Hindi — Nemotron translates them to
+              English while preserving code identifiers and config keys exactly as written,
+              so the entity-linking step still works correctly.
             </p>
           </div>
         </div>
@@ -391,7 +390,7 @@ export default function Landing() {
       <PipelineDiagram />
       <LiveStats />
       <BuiltOn />
-      <IndiaSection />
+      <NvidiaSection />
       <FinalCta />
     </main>
   )

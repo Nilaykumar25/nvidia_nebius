@@ -182,9 +182,9 @@ def stage1_check():
         print("NEO4J UNREACHABLE — aborting"); sys.exit(1)
     if not settings.github_token:
         print("GITHUB_TOKEN missing — aborting"); sys.exit(1)
-    if not settings.sarvam_api_key:
-        print("SARVAM_API_KEY missing — aborting"); sys.exit(1)
-    print("  Neo4j OK  |  GITHUB_TOKEN set  |  SARVAM_API_KEY set")
+    if not settings.llm_api_key:
+        print("LLM_API_KEY missing — aborting"); sys.exit(1)
+    print("  Neo4j OK  |  GITHUB_TOKEN set  |  LLM_API_KEY set")
 
 
 # ── Stage 2: fetch PR threads ─────────────────────────────────────────────────

@@ -63,22 +63,25 @@ def check_neo4j() -> bool:
 
 def check_llm() -> bool:
     from backend.app.config import settings
-    from backend.app.llm.provider import SarvamLLM
+    from backend.app.llm.provider import LLM
 
-    provider = settings.llm_provider
-    model = settings.sarvam_model if provider == "sarvam" else settings.llm_model
-    print(f"  Provider : {provider}")
-    print(f"  Model    : {model}")
+    base_url = settings.llm_base_url
+    model = settings.llm_model
+    key = settings.llm_api_key
 
-    key = settings.sarvam_api_key if provider == "sarvam" else settings.anthropic_api_key
+    print(f"  Base URL : {base_url or '(not set)'}")
+    print(f"  Model    : {model or '(not set)'}")
+
     if not key:
-        key_var = "SARVAM_API_KEY" if provider == "sarvam" else "ANTHROPIC_API_KEY"
-        print(f"  [SKIP] {key_var} not set in .env — cannot make live call.")
+        print("  [SKIP] LLM_API_KEY not set in .env — cannot make live call.")
+        return False
+    if not base_url or not model:
+        print("  [SKIP] LLM_BASE_URL or LLM_MODEL not set — cannot make live call.")
         return False
 
     print("  Key      : set (not echoed)")
     try:
-        llm = SarvamLLM() if provider == "sarvam" else _get_anthropic()
+        llm = LLM()
         response = llm.complete(
             "You are a test harness. Be extremely concise.",
             "Reply with exactly the single word: OK",
@@ -92,11 +95,6 @@ def check_llm() -> bool:
     except Exception as exc:
         print(f"  [FAIL] LLM call failed: {exc}", file=sys.stderr)
         return False
-
-
-def _get_anthropic():
-    from backend.app.llm.provider import AnthropicLLM
-    return AnthropicLLM()
 
 
 # ── main ──────────────────────────────────────────────────────────────────────

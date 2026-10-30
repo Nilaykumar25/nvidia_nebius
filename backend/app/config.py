@@ -17,11 +17,13 @@ class Settings(BaseSettings):
     max_prs: int = 400
     max_commits: int = 3000
 
-    llm_provider: str = "sarvam"
-    llm_model: str = "claude-sonnet-5-5"
-    anthropic_api_key: str = ""
-    sarvam_api_key: str = ""
-    sarvam_model: str = "sarvam-105b"
+    # ── LLM (OpenAI-compatible — Nebius Token Factory / Nemotron) ────────────
+    # Set these from your Nebius dashboard. Never hardcode values here.
+    llm_base_url: str = ""           # e.g. https://api.studio.nebius.ai/v1
+    llm_api_key: str = ""            # Nebius Token Factory API key
+    llm_model: str = ""              # e.g. nvidia/Llama-3_1-Nemotron-Ultra-253B-v1
+    llm_timeout_seconds: int = 60
+    llm_max_retries: int = 3
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dim: int = 384

@@ -391,9 +391,28 @@ function RefusedView({ res }) {
   )
 }
 
+/* ── Model badge ─────────────────────────────────────────────────── */
+function ModelBadge({ model }) {
+  if (!model) return null
+  const label = (model.toLowerCase().includes('nemotron'))
+    ? 'Nemotron 3 Ultra on Nebius Token Factory'
+    : model
+  return (
+    <div className="ac-model-badge" title={`Full model: ${model}`} aria-label={`Answered by ${label}`}>
+      <span className="ac-model-badge__dot" aria-hidden="true" />
+      Answered by {label}
+    </div>
+  )
+}
+
 /* ── Main export ─────────────────────────────────────────────────── */
 export default function AnswerCard({ res }) {
   if (res.status === 'refused') return <RefusedView res={res} />
-  return <AnsweredView res={res} />
+  return (
+    <>
+      <AnsweredView res={res} />
+      <ModelBadge model={res.llm_model} />
+    </>
+  )
 }
 

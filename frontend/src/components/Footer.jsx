@@ -60,6 +60,7 @@ export default function Footer() {
 
         <p className="footer__copy">
           © {new Date().getFullYear()} IntentLens. Built to surface decisions, not guess at them.
+          &nbsp;·&nbsp; Powered by NVIDIA Nemotron 3 Ultra on Nebius Token Factory.
         </p>
       </div>
     </footer>

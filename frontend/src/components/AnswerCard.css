@@ -575,6 +575,30 @@
   -webkit-box-orient: vertical;
 }
 
+/* ── Model badge ────────────────────────────────────────── */
+.ac-model-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 2px var(--sp-3);
+  margin-top: var(--sp-4);
+}
+
+.ac-model-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--active);
+  flex-shrink: 0;
+}
+
 /* ── Mobile ─────────────────────────────────────────────── */
 @media (max-width: 420px) {
   .ac-answer { font-size: 1rem; }

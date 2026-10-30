@@ -2,16 +2,12 @@
  * api.js — all backend calls
  *
  * In development:  Vite proxy strips /api prefix → http://127.0.0.1:8000
- * In production:   VITE_API_URL is the Render backend URL (no /api prefix)
+ * In production:   VITE_API_BASE_URL is the backend URL (no /api prefix)
  *                  e.g. https://intentlens-api.onrender.com
- *
- * The BASE helper returns:
- *   - dev  → "/api"              (routed through Vite proxy)
- *   - prod → "https://...render.com"  (direct fetch, no prefix)
  */
-const RENDER_URL = import.meta.env.VITE_API_URL   // set in Vercel env vars
+const RENDER_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL   // support both names
 
-// In dev, use /api (proxied by vite). In prod, use the Render URL directly.
+// In dev, use /api (proxied by vite). In prod, use the backend URL directly.
 const BASE = RENDER_URL
   ? RENDER_URL.replace(/\/$/, '')   // strip trailing slash
   : '/api'

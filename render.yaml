@@ -1,5 +1,14 @@
 # Render.com deployment — IntentLens backend (Python web service)
 # Frontend deploys separately to Vercel (see frontend/vercel.json)
+#
+# HOW TO DEPLOY:
+#   1. Push this repo to GitHub (public)
+#   2. Go to dashboard.render.com → New → Web Service → connect repo
+#   3. Render auto-detects this file — click Apply
+#   4. In Render → your service → Environment, paste in the four
+#      secrets marked  sync: false  below (Neo4j password, Neo4j URI,
+#      LLM_API_KEY, GITHUB_TOKEN)
+#   5. After first deploy, set ALLOWED_ORIGINS to your Vercel URL
 
 services:
   - type: web
@@ -12,27 +21,32 @@ services:
     healthCheckPath: /health
 
     envVars:
-      # ── Neo4j AuraDB ──────────────────────────────────────────────────────
+
+      # ── Neo4j AuraDB — paste secrets in Render dashboard ─────────────────
       - key: NEO4J_URI
-        sync: false          # paste at dashboard.render.com → Environment
+        sync: false          # neo4j+s://<instance-id>.databases.neo4j.io
       - key: NEO4J_USER
-        sync: false
+        sync: false          # your AuraDB instance ID (e.g. 228d5e41)
       - key: NEO4J_PASSWORD
-        sync: false
+        sync: false          # AuraDB password (shown once at creation)
       - key: NEO4J_DATABASE
-        sync: false
+        sync: false          # same as NEO4J_USER on AuraDB free tier
 
-      # ── LLM ──────────────────────────────────────────────────────────────
-      - key: LLM_PROVIDER
-        value: sarvam
-      - key: SARVAM_API_KEY
-        sync: false
-      - key: SARVAM_MODEL
-        value: sarvam-105b
+      # ── LLM — NVIDIA API ─────────────────────────────────────────────────
+      - key: LLM_BASE_URL
+        value: "https://integrate.api.nvidia.com/v1"
+      - key: LLM_API_KEY
+        sync: false          # your nvapi-... key from build.nvidia.com
+      - key: LLM_MODEL
+        value: "nvidia/nemotron-3-ultra-550b-a55b"
+      - key: LLM_TIMEOUT_SECONDS
+        value: "60"
+      - key: LLM_MAX_RETRIES
+        value: "3"
 
-      # ── GitHub (read-only, only needed if re-running ingest) ─────────────
+      # ── GitHub (only needed if re-running ingest on Render) ─────────────
       - key: GITHUB_TOKEN
-        sync: false
+        sync: false          # ghp_... classic token, public_repo scope
 
       # ── Repo config ───────────────────────────────────────────────────────
       - key: REPO_OWNER
@@ -41,17 +55,26 @@ services:
         value: redis
       - key: SUBSYSTEM_PATHS
         value: "src/replication.c,src/rdb.c,src/aof.c,redis.conf"
+      - key: MAX_PRS
+        value: "400"
+      - key: MAX_COMMITS
+        value: "3000"
 
-      # ── CORS — set to your Vercel URL after first deploy ─────────────────
-      # Replace the placeholder below with your real Vercel URL, e.g.:
-      # https://intentlens.vercel.app,https://intentlens-git-main-yourname.vercel.app
-      - key: ALLOWED_ORIGINS
-        value: "https://intentlens.vercel.app"
+      # ── Embeddings ────────────────────────────────────────────────────────
+      - key: EMBEDDING_MODEL
+        value: "sentence-transformers/all-MiniLM-L6-v2"
+      - key: EMBEDDING_DIM
+        value: "384"
 
-      # ── Behaviour ─────────────────────────────────────────────────────────
+      # ── Pipeline behaviour ────────────────────────────────────────────────
       - key: MAX_GRAPH_HOPS
         value: "3"
       - key: REFUSAL_THRESHOLD
         value: "0.35"
       - key: CACHE_DIR
         value: "data/cache"
+
+      # ── CORS ──────────────────────────────────────────────────────────────
+      # After Vercel deploy, update this to your actual Vercel URL
+      - key: ALLOWED_ORIGINS
+        value: "https://intentlens.vercel.app,http://localhost:5173"

@@ -16,10 +16,7 @@ build/
 
 # ── Cache — large data files that belong in object storage, not git ─────────
 data/repo/
-data/cache/*.jsonl
-data/cache/*.json
-data/cache/*.txt
-data/cache/llm/
+data/cache/
 
 # ── Node ────────────────────────────────────────────────────────────────────
 node_modules/
