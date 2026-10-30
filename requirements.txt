@@ -7,7 +7,6 @@ pydriller==2.12
 httpx==0.28.1
 openai==1.82.0
 sentence-transformers==6.2.0
-transformers==4.47.1
 numpy==2.4.6
 pyyaml==6.0.3
 tqdm==4.70.1
