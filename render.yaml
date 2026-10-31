@@ -75,6 +75,6 @@ services:
         value: "data/cache"
 
       # ── CORS ──────────────────────────────────────────────────────────────
-      # After Vercel deploy, update this to your actual Vercel URL
+      # Update this to match your actual Vercel URL
       - key: ALLOWED_ORIGINS
-        value: "https://intentlens.vercel.app,http://localhost:5173"
+        value: "https://intentlensnvidia.vercel.app,https://intentlens.vercel.app,http://localhost:5173"

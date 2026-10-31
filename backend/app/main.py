@@ -70,6 +70,12 @@ def _llm_health() -> dict:
     return {"model": model, "base_url": base_url, "key_set": key_set, "ping_ok": ping_ok}
 
 
+@app.get("/")
+def root():
+    """Root — redirect hint for browsers hitting the API URL directly."""
+    return {"service": "IntentLens API", "status": "ok", "docs": "/docs"}
+
+
 @app.get("/health")
 def health():
     """Liveness probe — always returns 200 if the process is alive."""
