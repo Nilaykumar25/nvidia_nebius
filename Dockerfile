@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # Cache bust: force fresh install
-ARG CACHE_BUST=2
+ARG CACHE_BUST=3
 
 # git is needed by PyDriller for local repo operations
 RUN apt-get update && apt-get install -y --no-install-recommends git \
