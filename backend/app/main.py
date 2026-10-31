@@ -70,35 +70,6 @@ def _llm_health() -> dict:
     return {"model": model, "base_url": base_url, "key_set": key_set, "ping_ok": ping_ok}
 
 
-@app.get("/debug-neo4j")
-def debug_neo4j():
-    """Temporary: show exact Neo4j connection error."""
-    from .config import settings
-    try:
-        from neo4j import GraphDatabase
-        driver = GraphDatabase.driver(
-            settings.neo4j_uri,
-            auth=(settings.neo4j_user, settings.neo4j_password),
-        )
-        with driver.session(database=settings.neo4j_database) as s:
-            result = s.run("RETURN 1 AS ok").single()
-        driver.close()
-        return {
-            "connected": True,
-            "uri": settings.neo4j_uri,
-            "user": settings.neo4j_user,
-            "database": settings.neo4j_database,
-        }
-    except Exception as exc:
-        return {
-            "connected": False,
-            "error": str(exc),
-            "uri": settings.neo4j_uri,
-            "user": settings.neo4j_user,
-            "database": settings.neo4j_database,
-        }
-
-
 @app.get("/health")
 def health():
     """Liveness probe — always returns 200 if the process is alive."""
